@@ -1,28 +1,41 @@
 const nodemailer = require("nodemailer");
 
-const sendEmail = async (to, subject, text) => {
-  try {
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
+const sendOtpEmail = async (user, otp, type = "register") => {
+  const transport = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
 
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
 
-    await transporter.sendMail({
-      from: `"Auth App" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      text,
-    });
+  let subject = "Email Verification OTP";
 
-    console.log("Email sent successfully");
-  } catch (error) {
-    console.log("Email Error:", error.message);
-    throw new Error("Email could not be sent");
+  if (type === "login") {
+    subject = "Login Verification OTP";
   }
+
+  if (type === "forgot-password") {
+    subject = "Forgot Password OTP";
+  }
+
+  const mailOptions = {
+    from: `"Auth App" <${process.env.EMAIL_USER}>`,
+    to: user.email,
+    subject,
+    text: `Your OTP is ${otp}. This OTP is valid for 10 minutes.`,
+  };
+
+  const info = await transport.sendMail(mailOptions);
+
+  console.log("OTP email sent:", info.messageId);
+
+  return info;
 };
 
-module.exports = sendEmail;
+module.exports = {
+  sendOtpEmail,
+};

@@ -18,6 +18,13 @@ app.use(
   })
 );
 
+console.log("EMAIL_USER:", process.env.EMAIL_USER);
+
+console.log(
+  "EMAIL_PASS:",
+  process.env.EMAIL_PASS ? "Loaded ✅" : "Missing ❌"
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());

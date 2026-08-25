@@ -188,7 +188,7 @@ const loginSendOtp = async (req, res) => {
       });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = normalizeEmail(email);
 
     const user = await User.findOne({
       email: normalizedEmail,
@@ -208,48 +208,31 @@ const loginSendOtp = async (req, res) => {
       });
     }
 
-    if (user.otpResendCount >= 4) {
-      return res.status(429).json({
-        success: false,
-        message: "OTP resend limit reached",
-      });
-    }
-
-    const otp = generateOtp();
-
-    user.otp = String(otp);
-
-    user.otpExpire = new Date(
-      Date.now() + 10 * 60 * 1000
+    const otpData = await prepareOtp(
+      user,
+      "login"
     );
-
-    user.otpPurpose = "login";
-
-    user.otpResendCount =
-      (user.otpResendCount || 0) + 1;
-
-    await user.save();
-
-    console.log("LOGIN OTP SAVED:", {
-      email: user.email,
-      otp: user.otp,
-      purpose: user.otpPurpose,
-      expire: user.otpExpire,
-      resendCount: user.otpResendCount,
-    });
 
     await sendOtpEmail(
       user,
-      otp,
+      otpData.otp,
       "login"
     );
 
     return res.status(200).json({
       success: true,
       message: "Login OTP sent successfully",
-      resendCount: user.otpResendCount,
+
+      otpExpiresIn: 600,
+
+      resendCount:
+        otpData.resendCount,
+
+      remainingResends:
+        otpData.remainingResends,
+
       resendBlocked:
-        user.otpResendCount >= 4,
+        otpData.remainingResends === 0,
     });
   } catch (error) {
     console.log(
@@ -257,10 +240,23 @@ const loginSendOtp = async (req, res) => {
       error
     );
 
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    return res
+      .status(error.statusCode || 500)
+      .json({
+        success: false,
+
+        message:
+          error.message ||
+          "Could not send OTP",
+
+        resendBlocked:
+          Boolean(error.resendBlocked),
+
+        remainingResends:
+          error.resendBlocked
+            ? 0
+            : undefined,
+      });
   }
 };
 

@@ -7,8 +7,8 @@ const {
   loginWithPassword,
   loginSendOtp,
   loginVerifyOtp,
-  me,
   logout,
+  users,
 } = require("../controllers/authController");
 
 const router = express.Router();
@@ -19,7 +19,7 @@ router.post("/register/set-password", registerSetPassword);
 router.post("/login/password", loginWithPassword);
 router.post("/login/send-otp", loginSendOtp);
 router.post("/login/verify-otp", loginVerifyOtp);
-router.get("/me", authMiddleware, me);
+router.get("/users", authMiddleware, users);
 router.post("/logout", logout);
 
 module.exports = router;

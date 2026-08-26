@@ -1,9 +1,12 @@
-# Frontend Auth UI
+# Frontend
 
-## Setup
-1. Copy `.env.example` to `.env` if you want to override the API URL.
-2. Run `npm install`.
-3. Run `npm run dev`.
+React + Vite + Bootstrap authentication UI.
 
-Frontend default: http://localhost:5173
-Backend API default: http://localhost:5000/api
+## Run
+
+```bash
+npm install
+npm run dev
+```
+
+Copy `.env.example` to `.env` and configure `VITE_API_URL`. See `../PROJECT_DOCUMENTATION.md` for complete setup and deployment instructions.

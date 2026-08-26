@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import OtpInput from "./OtpInput";
 import api from "../services/api";
@@ -20,8 +20,25 @@ const RegisterForm = () => {
   const [resendBlocked, setResendBlocked] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [otpTimeLeft, setOtpTimeLeft] = useState(600);
 
   const getError = (err, fallback) => err.response?.data?.message || fallback;
+
+  useEffect(() => {
+    if (step !== 2 || otpTimeLeft <= 0) return undefined;
+
+    const timer = setInterval(() => {
+      setOtpTimeLeft((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [step, otpTimeLeft]);
+
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -43,6 +60,7 @@ const RegisterForm = () => {
         email: formData.email.trim(),
       });
       setRemainingResends(data.remainingResends ?? 3);
+      setOtpTimeLeft(data.otpExpiresIn ?? 600);
       setResendBlocked(Boolean(data.resendBlocked));
       setMessage(data.message);
       setOtpKey((k) => k + 1);
@@ -64,6 +82,7 @@ const RegisterForm = () => {
     e.preventDefault();
     setError("");
     setMessage("");
+    if (otpTimeLeft <= 0) return setError("OTP expired. Please request a new OTP.");
     if (formData.otp.length !== 6) return setError("Please enter complete 6 digit OTP.");
 
     try {
@@ -144,11 +163,13 @@ const RegisterForm = () => {
         <form onSubmit={sendOtp}>
           <div className="mb-3">
             <label className="form-label">Full Name</label>
-            <div className="input-group custom-input"><span className="input-group-text"><i className="bi bi-person" /></span><input name="name" className="form-control" placeholder="Enter your full name" value={formData.name} onChange={handleChange} /></div>
+            <div className="input-group custom-input"><span className="input-group-text"><i className="bi bi-person" />
+            </span><input name="name" className="form-control" placeholder="Enter your full name" value={formData.name} onChange={handleChange} /></div>
           </div>
           <div className="mb-4">
             <label className="form-label">Email Address</label>
-            <div className="input-group custom-input"><span className="input-group-text"><i className="bi bi-envelope" /></span><input type="email" name="email" className="form-control" placeholder="example@gmail.com" value={formData.email} onChange={handleChange} /></div>
+            <div className="input-group custom-input"><span className="input-group-text"><i className="bi bi-envelope" /></span>
+              <input type="email" name="email" className="form-control" placeholder="example@gmail.com" value={formData.email} onChange={handleChange} /></div>
           </div>
           <button className="btn register-btn w-100" disabled={loading}>{loading ? "Sending OTP..." : "Send OTP"}</button>
         </form>
@@ -160,18 +181,21 @@ const RegisterForm = () => {
             <div className="mail-icon mx-auto"><i className="bi bi-envelope-check-fill" /></div>
             <p className="mb-1 mt-3 text-secondary">Verification code sent to</p>
             <strong>{formData.email}</strong>
-            <button type="button" className="btn change-email-btn d-block mx-auto" onClick={() => { setStep(1); setError(""); setMessage(""); }}>Change Email</button>
+            <button type="button" className="btn change-email-btn d-block mx-auto" onClick={() => {
+              setStep(1); setError(""); setMessage(""); setOtpTimeLeft(600);
+            }}>Change Email</button>
           </div>
 
+          <div className="text-center mb-3"><span className={otpTimeLeft > 0 ? "otp-timer" : "otp-timer expired"}>{otpTimeLeft > 0 ? `OTP expires in ${formatTime(otpTimeLeft)}` : "OTP expired"}</span></div>
           <label className="form-label text-center d-block mb-3">Enter 6 Digit OTP</label>
           <OtpInput key={otpKey} onOtpChange={(otp) => setFormData((prev) => ({ ...prev, otp }))} />
 
-          <button type="submit" className="btn register-btn w-100 mt-4" disabled={loading || formData.otp.length !== 6}>{loading ? "Verifying..." : "Verify OTP"}</button>
+          <button type="submit" className="btn register-btn w-100 mt-4" disabled={loading || formData.otp.length !== 6 || otpTimeLeft <= 0}>{loading ? "Verifying..." : "Verify OTP"}</button>
 
           <div className="text-center mt-3">
             <span className="small text-secondary">Resends left: {remainingResends}</span>
             <button type="button" className="btn resend-btn" disabled={loading || resendBlocked || remainingResends <= 0} onClick={sendOtp}>
-              {resendBlocked || remainingResends <= 0 ? "Resend Blocked" : "Resend OTP"}
+              {resendBlocked || remainingResends <= 0 ? "Resend Blocked" : `Resend OTP (${remainingResends} left)`}
             </button>
           </div>
         </form>
@@ -179,10 +203,11 @@ const RegisterForm = () => {
 
       {step === 3 && (
         <form onSubmit={createAccount}>
-          <div className="verified-email mb-4"><div className="verified-icon"><i className="bi bi-patch-check-fill" /></div><div><strong>Email Verified</strong><small>{formData.email}</small></div></div>
+          <div className="verified-email mb-4"><div className="verified-icon"><i className="bi bi-patch-check-fill" />
+          </div><div><strong>Email Verified</strong><small>{formData.email}</small></div></div>
           <div className="mb-3">
             <label className="form-label">Create Password</label>
-            <div className="input-group custom-input"><span className="input-group-text"><i className="bi bi-lock" /></span><input type={showPassword ? "text" : "password"} name="password" className="form-control" placeholder="Example: Dax@1234" value={formData.password} onChange={handleChange} /><button type="button" className="btn eye-btn" onClick={() => setShowPassword(!showPassword)}><i className={showPassword ? "bi bi-eye-slash" : "bi bi-eye"} /></button></div>
+            <div className="input-group custom-input"><span className="input-group-text"><i className="bi bi-lock" /></span><input type={showPassword ? "text" : "password"} name="password" className="form-control" placeholder="Example: Meet@1234" value={formData.password} onChange={handleChange} /><button type="button" className="btn eye-btn" onClick={() => setShowPassword(!showPassword)}><i className={showPassword ? "bi bi-eye-slash" : "bi bi-eye"} /></button></div>
             <small className="password-note">8+ chars, uppercase, lowercase, number and special character.</small>
           </div>
           <div className="mb-4">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import OtpInput from "./OtpInput";
 import { useNavigate } from "react-router-dom";
@@ -18,9 +18,26 @@ const LoginForm = () => {
   const [message, setMessage] = useState("");
   const [remainingResends, setRemainingResends] = useState(3);
   const [resendBlocked, setResendBlocked] = useState(false);
+  const [otpTimeLeft, setOtpTimeLeft] = useState(600);
 
   const getError = (err, fallback) => err.response?.data?.message || fallback;
   const validEmail = () => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+  useEffect(() => {
+    if (!otpStep || otpTimeLeft <= 0) return undefined;
+
+    const timer = setInterval(() => {
+      setOtpTimeLeft((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [otpStep, otpTimeLeft]);
+
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
 
   const passwordLogin = async (e) => {
     e.preventDefault();
@@ -75,6 +92,7 @@ const LoginForm = () => {
       setLoading(true);
       const { data } = await api.post("/auth/login/send-otp", { email });
       setRemainingResends(data.remainingResends ?? 3);
+      setOtpTimeLeft(data.otpExpiresIn ?? 600);
       setResendBlocked(Boolean(data.resendBlocked));
       setOtp("");
       setOtpKey((k) => k + 1);
@@ -92,6 +110,10 @@ const LoginForm = () => {
 
     setError("");
     setMessage("");
+
+    if (otpTimeLeft <= 0) {
+      return setError("OTP expired. Please request a new OTP.");
+    }
 
     if (otp.length !== 6) {
       return setError(
@@ -137,6 +159,7 @@ const LoginForm = () => {
     setError(""); setMessage("");
     setRemainingResends(3);
     setResendBlocked(false);
+    setOtpTimeLeft(600);
   };
 
   return (
@@ -176,14 +199,15 @@ const LoginForm = () => {
           <div className="text-center mb-4">
             <div className="otp-mail-icon mx-auto"><i className="bi bi-envelope-check-fill" /></div>
             <p className="text-secondary mb-1 mt-3">Verification code sent to</p><strong>{email}</strong>
-            <button type="button" className="btn change-email-btn d-block mx-auto" onClick={() => { setOtpStep(false); setOtp(""); setError(""); setMessage(""); }}>Change Email</button>
+            <button type="button" className="btn change-email-btn d-block mx-auto" onClick={() => { setOtpStep(false); setOtp(""); setError(""); setMessage(""); setOtpTimeLeft(600); }}>Change Email</button>
           </div>
+          <div className="text-center mb-3"><span className={otpTimeLeft > 0 ? "otp-timer" : "otp-timer expired"}>{otpTimeLeft > 0 ? `OTP expires in ${formatTime(otpTimeLeft)}` : "OTP expired"}</span></div>
           <label className="form-label text-center d-block mb-3">Enter 6 Digit OTP</label>
           <OtpInput key={otpKey} classNamePrefix="login-otp" onOtpChange={setOtp} />
-          <button type="submit" className="btn login-main-btn w-100 mt-4" disabled={loading || otp.length !== 6}>{loading ? "Verifying..." : "Verify & Login"}</button>
+          <button type="submit" className="btn login-main-btn w-100 mt-4" disabled={loading || otp.length !== 6 || otpTimeLeft <= 0}>{loading ? "Verifying..." : "Verify & Login"}</button>
           <div className="text-center mt-3">
             <span className="small text-secondary">Resends left: {remainingResends}</span>
-            <button type="button" className="btn resend-btn" disabled={loading || resendBlocked || remainingResends <= 0} onClick={sendOtp}>{resendBlocked || remainingResends <= 0 ? "Resend Blocked" : "Resend OTP"}</button>
+            <button type="button" className="btn resend-btn" disabled={loading || resendBlocked || remainingResends <= 0} onClick={sendOtp}>{resendBlocked || remainingResends <= 0 ? "Resend Blocked" : `Resend OTP (${remainingResends} left)`}</button>
           </div>
         </form>
       )}

@@ -1,4 +1,8 @@
 const nodemailer = require("nodemailer");
+const dns = require("dns");
+
+// Prefer IPv4 instead of IPv6
+dns.setDefaultResultOrder("ipv4first");
 
 const transport = nodemailer.createTransport({
   host: "smtp.gmail.com",
@@ -10,9 +14,16 @@ const transport = nodemailer.createTransport({
     pass: process.env.EMAIL_PASS,
   },
 
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 15000,
+  // Force IPv4
+  family: 4,
+
+  connectionTimeout: 15000,
+  greetingTimeout: 15000,
+  socketTimeout: 20000,
+
+  tls: {
+    servername: "smtp.gmail.com",
+  },
 });
 
 const sendEmail = async ({
@@ -21,6 +32,7 @@ const sendEmail = async ({
   body,
 }) => {
   console.log("SMTP sending started...");
+  console.log("Sending to:", email);
 
   const info = await transport.sendMail({
     from: `"Auth App" <${process.env.EMAIL_USER}>`,
@@ -30,6 +42,7 @@ const sendEmail = async ({
   });
 
   console.log("SMTP response:", info.response);
+  console.log("Message ID:", info.messageId);
 
   return info;
 };

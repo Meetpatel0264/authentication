@@ -8,21 +8,33 @@ const worker = new Worker(
   "email-queue",
   async (job) => {
     console.log(`Processing email job ${job.id}`);
+    console.log("Sending email to:", job.data.email);
 
-    await sendEmail({
-      email: job.data.email,
-      subject: job.data.subject,
-      body: job.data.body,
-    });
+    try {
+      const info = await sendEmail({
+        email: job.data.email,
+        subject: job.data.subject,
+        body: job.data.body,
+      });
 
-    return {
-      email: job.data.email,
-      sentAt: new Date().toISOString(),
-    };
+      console.log("Mail sent successfully");
+      console.log("Message ID:", info.messageId);
+
+      return {
+        email: job.data.email,
+        messageId: info.messageId,
+        sentAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      console.error("SEND EMAIL ERROR:", error.message);
+      throw error;
+    }
   },
   {
     connection,
-    concurrency: Number(process.env.EMAIL_WORKER_CONCURRENCY || 5),
+    concurrency: Number(
+      process.env.EMAIL_WORKER_CONCURRENCY || 5
+    ),
   }
 );
 
@@ -35,13 +47,21 @@ worker.on("completed", (job) => {
 });
 
 worker.on("failed", (job, error) => {
-  console.error(`Email job ${job?.id} failed: ${error.message}`);
+  console.error(
+    `Email job ${job?.id} failed: ${error.message}`
+  );
+});
+
+worker.on("error", (error) => {
+  console.error("Worker error:", error.message);
 });
 
 const shutdown = async () => {
   console.log("Stopping email worker...");
+
   await worker.close();
   await connection.quit();
+
   process.exit(0);
 };
 

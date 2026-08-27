@@ -43,13 +43,26 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({
-    success: true,
-    server: "online",
-    mongo: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
-    redis: redisConnection.status,
-    timestamp: new Date().toISOString(),
-  });
+  const mongoConnected =
+    mongoose.connection.readyState === 1;
+
+  const redisConnected =
+    redisConnection.status === "ready";
+
+  const healthy =
+    mongoConnected && redisConnected;
+
+  return res
+    .status(healthy ? 200 : 503)
+    .json({
+      success: healthy,
+      server: "online",
+      mongo: mongoConnected
+        ? "connected"
+        : "disconnected",
+      redis: redisConnection.status,
+      timestamp: new Date().toISOString(),
+    });
 });
 
 app.use("/api/auth", authRoutes);
